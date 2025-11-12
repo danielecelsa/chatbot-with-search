@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"tavily-mcp": {
+			"url": "https://tavily-mcp-server-wqe5.onrender.com/tav/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}
