@@ -1,15 +1,21 @@
 [project]
-name = "tavily-client"
+name = "tavily-client-new"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "langchain>=0.3.27",
-    "langchain-community>=0.3.27",
-    "langchain-google-genai>=2.1.9",
-    "langchain-mcp-adapters>=0.1.9",
-    "mcp[cli]>=1.12.4",
+    "langchain-mcp-adapters==0.1.9",
+    "mcp[cli]==1.13.0",
+    "nest-asyncio>=1.6.0",
+    "langchain==0.3.27",
+    "langchain-community>=0.3.29",
+    "langchain-core>=0.3.76",
+    "langchain-google-genai==2.1.10",
+    "langgraph==0.6.7",
+    "logtail-python>=0.3.4",
     "python-dotenv>=1.1.1",
-    "streamlit>=1.48.0",
+    "redis>=7.0.1",
+    "streamlit>=1.49.1",
+    "valkey>=6.1.1",
 ]
