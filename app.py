@@ -452,26 +452,27 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown(" ")
-    st.header("Performance & Cost :bar_chart:")
     with st.expander("Token Usage & Latency:"):
-        st.metric(label="Latency (s)", value=f"{st.session_state.latency:.2f}", help="Time for the last response.")
+        st.metric(label=":blue[Latency (s)]", value=f"{st.session_state.latency:.2f}", help="Time for the last response.")
         
-        st.markdown("#### Last Interaction")
+        st.markdown("#### :blue[Last Interaction Token]")
         col1, col2 = st.columns(2)
         col1.metric("Input Tokens", f"{st.session_state.input_tokens_last}")
         col2.metric("Output Tokens", f"{st.session_state.output_tokens_last}")
         st.metric("Last Est. Cost (USD)", f"${st.session_state.usd_last:.5f}", help="Estimated cost for the last interaction.")
 
-        st.markdown("#### Session Total")
+        st.markdown("#### :blue[Session Total Token]")
         col3, col4 = st.columns(2)
         col3.metric("Total Input", f"{st.session_state.total_input_tokens}")
         col4.metric("Total Output", f"{st.session_state.total_output_tokens}")
         st.metric("Total Est. Cost (USD)", f"${st.session_state.usd:.5f}", help="Estimated cost for the entire session.")
 
+    st.markdown("---")
+    st.markdown(" ")
 # ------------------------------
 # Safe intermediate steps (trace) - global section visible outside submit
 # ------------------------------
-    with st.expander("🔍 Intermediate steps (tools & observations)"):
+    with st.expander("Agent's Reasoning Steps:"):
         if not st.session_state.trace:
             st.caption("No tool usage in the last turn.")
         else:
@@ -487,6 +488,9 @@ with st.sidebar:
                             st.markdown(obs[:1000] + "...")
                         else:
                             st.markdown(obs)
+
+    st.markdown("---")
+    st.markdown(" ")
 
 # ------------------------------
 # Provenance (separate section, visible on demand)
