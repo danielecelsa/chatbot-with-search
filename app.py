@@ -11,10 +11,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import uuid
-import redis
 import valkey
-import logging
-from logtail import LogtailHandler
 import time
 from time import perf_counter
 
@@ -33,13 +30,15 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # MCP tools
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
+from logging_config import (
+    get_logger,
+)
 
 # Helpers (token estimation, cost computation, safe serialization)
 from helpers import (
     process_agent_events,
     compute_cost,
     get_user_info,
-    append_log
 )
 
 from async_bg import collect_events_from_agent
@@ -57,9 +56,6 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 COST_PER_1K_INPUT = float(os.getenv("COST_PER_1K_TOKENS_USD_INPUT", "0.002"))
 COST_PER_1K_OUTPUT = float(os.getenv("COST_PER_1K_TOKENS_USD_OUTPUT", "0.002"))
 
-LOG_DIR = Path(os.environ.get("CHAT_LOG_DIR", "./logs"))
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
 MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", "tavily")
 MCP_URL = os.getenv("MCP_TAVILY_URL", "https://tavily-mcp-server-wqe5.onrender.com/tav/mcp/")
 
@@ -74,115 +70,10 @@ MCP_CONFIG = {
 # LOGGING SETUP
 # ------------------------------
 
-# ------------------------------
-# Key-Value Store (Valkey/Redis) Setup
-# ------------------------------
-@st.cache_resource
-def get_kv_client():
-    """
-    Gets a singleton Valkey/Redis client connection.
-    Uses REDIS_URL from environment variables for production (Render).
-    Falls back to a local connection for development.
-    """
-    # Render provides the connection string for its Valkey service in the REDIS_URL env var
-    redis_url = os.environ.get("REDIS_URL", None)
-
-    try:
-        if redis_url:
-            # Production environment (Render) - use the provided URL
-            logger.info("Connecting to Key-Value store via REDIS_URL.")
-            kv_client = valkey.from_url(redis_url, decode_responses=True)
-        else:
-            # Local development - connect to your local Redis/Valkey instance
-            logger.info("REDIS_URL not found. Connecting to localhost.")
-            kv_client = valkey.Redis(host="localhost", port=6379, db=0, decode_responses=True)
-
-        # Ping the server to check if the connection is alive
-        kv_client.ping()
-        logger.info("Successfully connected to Key-Value store.")
-        return kv_client
-        
-    except valkey.exceptions.ConnectionError as e:
-        logger.warning(f"Could not connect to Key-Value store: {e}. Using in-memory queue as fallback.")
-        return None
-
-# --- Custom Redis Logging Handler ---
-class RedisLogHandler(logging.Handler):
-    """
-    A logging handler that publishes records to a capped Redis list.
-    """
-    def __init__(self, client, key, max_entries=500):
-        super().__init__()
-        self.client = client
-        self.key = key
-        self.max_entries = max_entries
-
-    def emit(self, record):
-        """
-        Takes a log record, formats it, and pushes it to Redis.
-        """
-        try:
-            # Format the log record into a string
-            log_entry = self.format(record)
-            # Push the entry to the left of the list
-            self.client.lpush(self.key, log_entry)
-            # Trim the list to keep only the latest max_entries
-            self.client.ltrim(self.key, 0, self.max_entries - 1)
-        except Exception:
-            # If Redis fails, we don't want the logger to crash the app
-            pass
-
-# Define the name for our Redis list for logs
-REDIS_LOGS_KEY = "tavily_logs"
-
-# Get the top-level logger
-logger = logging.getLogger("tool_logger")
-logger.setLevel(logging.INFO)
-
-# Prevent log messages from propagating to the root logger
-logger.propagate = False
-
-# Remove any existing handlers to avoid duplicates
-if logger.hasHandlers():
-    logger.handlers.clear()
-
-# --- Handler 1: Always write to a local file (great for local debugging) ---
-file_handler = logging.FileHandler("logs/tavily_debug.log", mode="a")
-file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(file_formatter)
-logger.addHandler(file_handler)
-
-# Get the singleton instances
-kv_client = get_kv_client() # Valkey client (Redis-compatible)
-
-# --- Handler 2: Add the Logtail handler IF the token is available (for production) ---
-logtail_token = os.environ.get("LOGTAIL_SOURCE_TOKEN")
-logtail_urL = os.environ.get("LOGTAIL_URL")
-if logtail_token:
-    try:
-        logtail_handler = LogtailHandler(
-            source_token=logtail_token, 
-            host=logtail_urL,
-        )
-        logtail_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        logtail_handler.setFormatter(logtail_formatter)
-        logger.addHandler(logtail_handler)
-        logger.info("Logtail persistent logging handler successfully configured.")
-    except Exception as e:
-        logger.warning(f"Failed to configure Logtail logging handler: {e}")
-else:
-    # --- Fallback Handler: Use Valkey/Redis for logs ONLY if Logtail isn't configured ---
-    if kv_client:
-        try:
-            # We keep RedisLogHandler class definition, but only use it as a fallback
-            redis_handler = RedisLogHandler(client=kv_client, key=REDIS_LOGS_KEY)
-            redis_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            redis_handler.setFormatter(redis_formatter)
-            logger.addHandler(redis_handler)
-            logger.info("Logtail token not found. Key-Value Valkey/Redis logging handler successfully configured..")
-        except Exception as e:
-            logger.warning(f"Failed to configure Valkey/Redis fallback logging handler: {e}")
-
+logger_local = get_logger("local")
+logger_betterstack = get_logger("betterstack")
+logger_redis = get_logger("redis")
+logger_all = get_logger("all") 
 
 # --------------------------------------
 # Streamlit session state initialization
@@ -232,7 +123,7 @@ def get_llm():
         safety_settings=None,
         )
     except Exception as e:
-        logger.exception("Could not initialize LLM: %s", e)
+        logger_all.exception("Could not initialize LLM: %s", e)
         llm = None 
 
     return llm
@@ -293,7 +184,7 @@ def build_agent():
         mcp_client = MultiServerMCPClient(MCP_CONFIG)
         tools = asyncio.run(mcp_client.get_tools())
     except Exception as e:
-        print("Could not initialize MCP client/tools:", e)
+        logger_all.error("Could not initialize MCP client/tools: %s", e)
 
     agent = create_react_agent(
         model=get_llm(),
@@ -310,7 +201,7 @@ agent = build_agent()
 # Streamlit UI
 # ------------------------------
 st.set_page_config(page_title="Agentic Web Researcher", page_icon="🤖", layout="wide")
-st.title("Agentic Web Researcher — Chat with web research")
+st.title("Agentic Web Researcher — Chat with web search")
 body="""
 ## Chatbot with LangGraph ReAct agent + MCP/Tavily web search tool
 This demo showcases a chatbot powered by a LangGraph ReAct agent connected to an MCP server with Tavily web search capabilities.
@@ -332,8 +223,8 @@ user_query = st.chat_input("Type your message here...")
 if user_query:
     
     # Get user info as soon as they submit a query
-    user_details = get_user_info(logger)
-    logger.info(
+    user_details = get_user_info(logger_all)
+    logger_all.info(
         f"New query received from IP: {user_details['ip']} "
         f"with User-Agent: {user_details['user_agent']}"
     )
@@ -385,38 +276,38 @@ if user_query:
             st.error(ai_content)
             st.session_state.trace = []
 
-        st.session_state.latency = perf_counter() - start
-    
-    st.session_state.chat_history.append(AIMessage(content=ai_content))
+    st.session_state.latency = perf_counter() - start
 
     # Calculate costs for UI display
     try:
         st.session_state.usd = compute_cost(st.session_state.total_input_tokens, st.session_state.total_output_tokens, COST_PER_1K_INPUT, COST_PER_1K_OUTPUT)
     except Exception:
-        logger.exception("Error computing total cost: %s", e)
+        logger_all.exception("Error computing total cost: %s", e)
         st.session_state.usd = 0.0
     
     try:
         st.session_state.usd_last = compute_cost(st.session_state.input_tokens_last, st.session_state.output_tokens_last, COST_PER_1K_INPUT, COST_PER_1K_OUTPUT)
     except Exception:
-        logger.exception("Error computing last cost: %s", e)
+        logger_all.exception("Error computing last cost: %s", e)
         st.session_state.usd_last = 0.0
+    
+    st.session_state.chat_history.append(AIMessage(content=ai_content))
 
-    # Append a structured log
-    try:
-        append_log({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "model": MODEL,
-            "messages": [{"role": m.__class__.__name__, "content": m.content} for m in st.session_state.chat_history],
-            "trace": st.session_state.trace,
-            "provenance": st.session_state.provenance.get(thread_id, []),
-            "usage_last": {
-                "input": st.session_state.input_tokens_last,
-                "output": st.session_state.output_tokens_last,
-            },
-        }, LOG_DIR)
-    except Exception as e:
-        print("Failed to append log:", e)
+    # --- LOGGING ---
+    logger_all.info("Latency for full response: %.2f seconds", st.session_state.latency)
+    logger_all.info("Last interaction tokens: %d (input), %d (output), %d (total)", st.session_state.input_tokens_last, st.session_state.output_tokens_last, st.session_state.total_tokens_last)
+    logger_all.info("Estimated last interaction cost: $%.5f", st.session_state.usd_last)
+    logger_all.info("Total tokens so far: %d (input), %d (output), %d (total)", st.session_state.total_input_tokens, st.session_state.total_output_tokens, st.session_state.total_tokens)
+    logger_all.info("Estimated total cost so far: $%.5f", st.session_state.usd)
+
+    data_dict={
+        "ts": datetime.datetime.now(timezone.utc).isoformat(),
+        "model": MODEL,
+        "messages": [{"role": m.__class__.__name__, "content": m.content} for m in st.session_state.chat_history],
+        "trace": st.session_state.trace,
+    }
+    logger_all.info(json.dumps(data_dict, indent=2, ensure_ascii=False))
+
 
 # ------------------------------
 # Sidebar
@@ -472,22 +363,22 @@ with st.sidebar:
 # ------------------------------
 # Safe intermediate steps (trace) - global section visible outside submit
 # ------------------------------
-    with st.expander("Agent's Reasoning Steps:"):
-        if not st.session_state.trace:
-            st.caption("No tool usage in the last turn.")
-        else:
-            for step in st.session_state.trace:
-                if step["type"] == "tool_call":
-                    with st.expander(f"🛠️ Calling Tool: `{step['tool']}`"):
-                        st.markdown("**Tool Input:**")
-                        st.code(json.dumps(step['tool_input'], indent=2), language="json")
-                elif step["type"] == "tool_output":
-                    with st.expander(f"👀 Observation from `{step['tool']}`"):
-                        obs = str(step['observation'])
-                        if len(obs) > 1000:
-                            st.markdown(obs[:1000] + "...")
-                        else:
-                            st.markdown(obs)
+    st.markdown("Agent's Reasoning Steps:")
+    if not st.session_state.trace:
+        st.caption("No tool usage in the last turn.")
+    else:
+        for step in st.session_state.trace:
+            if step["type"] == "tool_call":
+                with st.expander(f"🛠️ Calling Tool: `{step['tool']}`"):
+                    st.markdown("**Tool Input:**")
+                    st.code(json.dumps(step['tool_input'], indent=2), language="json")
+            elif step["type"] == "tool_output":
+                with st.expander(f"👀 Observation from `{step['tool']}`"):
+                    obs = str(step['observation'])
+                    if len(obs) > 1000:
+                        st.markdown(obs[:1000] + "...")
+                    else:
+                        st.markdown(obs)
 
     st.markdown("---")
     st.markdown(" ")
