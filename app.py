@@ -303,7 +303,7 @@ if user_query:
     logger_all.info("Estimated total cost so far: $%.5f", st.session_state.usd)
 
     data_dict={
-        "ts": datetime.datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "model": MODEL,
         "messages": [{"role": m.__class__.__name__, "content": m.content} for m in st.session_state.chat_history],
         "trace": st.session_state.trace,
