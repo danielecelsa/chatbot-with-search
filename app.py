@@ -4,6 +4,8 @@
 # - Uses a LangGraph checkpointer for persistence (Async SQLite if available, otherwise in-memory).
 # - Keeps features: conversation memory, safe intermediate-step trace (tools & observations), separate Provenance section, token usage & cost, JSONL logging.
 
+print("=== PRINT FROM PROCESS START ===")
+
 import os
 import asyncio
 import json
