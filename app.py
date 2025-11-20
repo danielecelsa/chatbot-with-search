@@ -404,7 +404,7 @@ with st.sidebar:
     # ------------------------------
     # Reasoning Steps Section
     # ------------------------------
-    st.markdown("Agent's Reasoning Steps:")
+    st.subheader("🧠 Agent's Reasoning Steps:")
     if not st.session_state.trace:
         st.caption("No tool usage in the last turn.")
     else:
@@ -434,7 +434,7 @@ with st.sidebar:
     # ------------------------------
     # Provenance Section
     # ------------------------------
-    st.markdown("Sources' Provenance:")
+    st.subheader("🗂️ Sources' Provenance:")
     
     # choose the provenance for the current thread or last message
     prov_key = st.session_state.conversation_thread_id or list(st.session_state.provenance.keys())[-1]
