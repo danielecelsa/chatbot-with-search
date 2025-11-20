@@ -91,5 +91,5 @@ streamlit run app.py
 ## 👨‍💻 Author
 Daniele Celsa
 
-*   [Portfolio Website] ()
-*   [LinkedIn] ()
+*   [Portfolio Website](https://danielecelsa.com)
+*   [LinkedIn](https://diretta.it)
