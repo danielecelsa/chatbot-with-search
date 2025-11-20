@@ -15,7 +15,7 @@ def process_agent_events(events: List[Dict]) -> Tuple[Optional[AIMessage], List[
     provenance = []
     final_answer = None
     last_interaction_usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
-
+    
     for event_chunk in events:
         if "agent" in event_chunk:
             agent_messages = event_chunk["agent"].get("messages", [])
@@ -28,7 +28,8 @@ def process_agent_events(events: List[Dict]) -> Tuple[Optional[AIMessage], List[
                 if msg.tool_calls:
                     for tool_call in msg.tool_calls:
                         trace.append({
-                            "type": "tool_call", "tool": tool_call.get("name"),
+                            "type": "tool_call", 
+                            "tool": tool_call.get("name"),
                             "tool_input": tool_call.get("args"),
                         })
                 elif msg.content:
@@ -38,10 +39,39 @@ def process_agent_events(events: List[Dict]) -> Tuple[Optional[AIMessage], List[
             for msg in tool_messages:
                 if not isinstance(msg, ToolMessage):
                     continue
+
+                # Try to parse the JSON to extract sources cleanly
+                parsed_provenance = []
+                try:
+                    data = json.loads(msg.content)
+                    if isinstance(data, dict) and "results" in data:
+                        # If it's the format of our new server
+                        parsed_provenance = data["results"]
+                    else:
+                        # Fallback
+                        parsed_provenance = data
+                    if isinstance(data, dict) and "query" in data:
+                        query = data["query"]
+                    else:
+                        query = None
+
+                except:
+                    # If it's not JSON, use the raw text
+                    parsed_provenance = msg.content
+                    query = None
+
                 trace.append({
-                    "type": "tool_output", "tool": msg.name, "observation": msg.content,
+                    "type": "tool_output", 
+                    "tool": msg.name, 
+                    "observation": msg.content,
                 })
-                provenance.append({"tool": msg.name, "content": msg.content})
+
+                provenance.append({
+                    "tool": msg.name,
+                    "extracted_sources": parsed_provenance,
+                    "raw_content": msg.content,
+                    "query": query
+                    })
     
     last_interaction_usage["total_tokens"] = last_interaction_usage["input_tokens"] + last_interaction_usage["output_tokens"]
     return final_answer, trace, provenance, last_interaction_usage
@@ -95,12 +125,3 @@ def get_user_info(logger: logging.Logger) -> dict:
         logger.warning(f"Could not get user info from Streamlit headers: {e}")
 
     return user_info
-
-def append_log(log_data: dict, log_dir: Any):
-    """Appends a JSON log entry to a file in the specified directory."""
-    try:
-        log_file = log_dir / "chat_logs.jsonl"
-        with open(log_file, "a") as f:
-            f.write(json.dumps(log_data) + "\n")
-    except Exception as e:
-        print(f"Failed to append log: {e}")
