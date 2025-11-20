@@ -50,9 +50,10 @@ The system is split into two decoupled microservices:
 ```bash
 git clone https://github.com/danielecelsa/chatbot-with-search.git
 cd chatbot-with-search
-
+```
 ### 2. Environment Variables
 Create a .env file in the root directory:
+```bash
 # LLM Configuration
 GOOGLE_API_KEY=your_google_api_key
 GENAI_MODEL=your_model
@@ -66,15 +67,15 @@ MCP_SERVER_NAME=tavily
 # Logging (Optional)
 REDIS_URL=redis://...
 LOGTAIL_SOURCE_TOKEN=...
-
+```
 ### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
-
+```
 ### 4. Run the Application
 ```bash
 streamlit run app.py
-
+```
 ---
 
 ## 🧩 How It Works (The ReAct Loop)
