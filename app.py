@@ -184,7 +184,6 @@ def get_prompt_template():
     
     return prompt
 
-print(f"Today is {datetime.now().date().isoformat()}")
 # ------------------------------
 # Build agent with checkpointer
 # ------------------------------
@@ -263,8 +262,6 @@ if user_query:
             # 1. Collect all events from the agent in the background
             events = collect_events_from_agent(agent, inputs, config=config, timeout=120)
 
-            logger_local.info("Collected events from agent: %s", events)
-
             # 2. Process the events with our new, focused parser
             final_answer_obj, trace, provenance, usage_last = process_agent_events(events)
 
@@ -331,10 +328,11 @@ if user_query:
 with st.sidebar:
     st.header("👨‍💻 Engineering Highlights", divider="rainbow")
     
-    st.info(
-        "This demo is designed to showcase production-ready capabilities in GenAI development."
-    )
-
+    st.info("This demo is designed to showcase production-ready capabilities in GenAI development.")
+   
+    # ------------------------------
+    # Info Section
+    # ------------------------------
     with st.expander("🛠️ Tech Stack & Implementation"):
         st.markdown("""
         **Core Orchestration:**
@@ -374,43 +372,41 @@ with st.sidebar:
     
     st.markdown("---")
 
+    # ------------------------------
     # Metrics Section
+    # ------------------------------
     st.subheader("📊 Live Metrics")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.metric(label="Latency", value=f"{st.session_state.latency:.2f}s")
+        st.metric(label=":blue[Latency]", value=f"{st.session_state.latency:.2f}s", help="Time taken to generate the last response.")
     with col2:
-        st.metric(label="Session Cost", value=f"${st.session_state.usd:.4f}")
+        st.metric(label=":blue[Session Cost]", value=f"${st.session_state.usd:.4f}", help="Estimated cost for the entire session." )
 
-    st.caption(f"Token Usage: {st.session_state.total_tokens} total tokens used.")
+    st.caption(f"Token Usage: :blue[{st.session_state.total_tokens}] total tokens used.", help="Total number of tokens consumed in the entire session.")
     
-    st.markdown("---")
-    st.markdown(" ")
-
-    with st.expander("Token Usage & Latency:"):
-        st.metric(label=":blue[Latency (s)]", value=f"{st.session_state.latency:.2f}", help="Time for the last response.")
-        
-        st.markdown("#### :blue[Last Interaction Token]")
+    with st.expander(":blue[Breakdown Token Usage:]"):        
+        st.markdown(f"##### :blue[Last Interaction Token:] {st.session_state.total_tokens_last}")
         col1, col2 = st.columns(2)
         col1.metric("Input Tokens", f"{st.session_state.input_tokens_last}")
         col2.metric("Output Tokens", f"{st.session_state.output_tokens_last}")
-        st.metric("Last Est. Cost (USD)", f"${st.session_state.usd_last:.5f}", help="Estimated cost for the last interaction.")
+        st.metric("Last Est. Cost (USD)", f"${st.session_state.usd_last:.4f}", help="Estimated cost for the last interaction.")
 
-        st.markdown("#### :blue[Session Total Token]")
+        st.markdown(f"##### :blue[Session Total Token:] {st.session_state.total_tokens}")
         col3, col4 = st.columns(2)
         col3.metric("Total Input", f"{st.session_state.total_input_tokens}")
         col4.metric("Total Output", f"{st.session_state.total_output_tokens}")
-        st.metric("Total Est. Cost (USD)", f"${st.session_state.usd:.5f}", help="Estimated cost for the entire session.")
+        st.metric("Total Est. Cost (USD)", f"${st.session_state.usd:.4f}", help="Estimated cost for the entire session.")
 
     st.markdown("---")
     st.markdown(" ")
-# ------------------------------
-# Safe intermediate steps (trace) - global section visible outside submit
-# ------------------------------
+
+    # ------------------------------
+    # Reasoning Steps Section
+    # ------------------------------
     st.markdown("Agent's Reasoning Steps:")
     if not st.session_state.trace:
-        st.caption("No tool usage in the last turn. Reasoning steps are shown only when tools are used.")
+        st.caption("No tool usage in the last turn.")
     else:
         for step in st.session_state.trace:
             if step["type"] == "tool_call":
@@ -435,29 +431,31 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(" ")
 
-# ------------------------------
-# Provenance (separate section, visible on demand)
-# ------------------------------
-    with st.expander("Sources' Provenance:"):
-        if not st.session_state.provenance:
-            st.caption("No provenance available.")
-        else:
-            # choose the provenance for the current thread or last message
-            prov_key = st.session_state.conversation_thread_id or list(st.session_state.provenance.keys())[-1]
-            items = st.session_state.provenance.get(prov_key, [])
-            
-            for item in items:
-                sources = item.get("extracted_sources")
-                # If we have a list of structured sources (from the new server)
-                if isinstance(sources, list) and len(sources) > 0 and isinstance(sources[0], dict):
-                    st.write(f"**Source from tool `{item['tool']}`**, for query: *{item.get('query', 'Unknown')}*:")
+    # ------------------------------
+    # Provenance Section
+    # ------------------------------
+    st.markdown("Sources' Provenance:")
+    
+    # choose the provenance for the current thread or last message
+    prov_key = st.session_state.conversation_thread_id or list(st.session_state.provenance.keys())[-1]
+    items = st.session_state.provenance.get(prov_key, [])
+
+    if not items:
+        st.caption("No provenance available (no search performed).")
+    else:    
+        for item in items:
+            sources = item.get("extracted_sources")
+            # If we have a list of structured sources (from the new server)
+            if isinstance(sources, list) and len(sources) > 0 and isinstance(sources[0], dict):
+                with st.expander(f"🗂️ Sources for query: *{item.get('query', 'Unknown')}*"):
+                    st.write(f"**Sources from tool `{item['tool']}`**:")
                     for s in sources:
                         title = s.get('title', 'No Title')
                         url = s.get('url', '#')
                         st.markdown(f"- [{title}]({url})")
-                else:
-                    # Fallback to the old raw method
-                    st.json(item)
+            else:
+                # Fallback to the old raw method
+                st.json(item)
 
     st.markdown("---")
     st.markdown("Developed by **[Daniele Celsa](https://www.domenicodanielecelsa.com)**")
@@ -477,4 +475,3 @@ for msg in st.session_state.chat_history:
         content = getattr(msg, "content", None) or str(msg)
         with st.chat_message("assistant"):
             st.write(content)
-
