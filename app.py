@@ -379,20 +379,20 @@ with st.sidebar:
     
     col1, col2 = st.columns(2)
     with col1:
-        st.metric(label=":blue[Latency]", value=f"{st.session_state.latency:.2f}s", help="Time taken to generate the last response.")
+        st.metric(label=":blue[Latency]", value=f"{st.session_state.latency:.2f}s", help="Time taken to generate the LAST response.")
     with col2:
-        st.metric(label=":blue[Session Cost]", value=f"${st.session_state.usd:.4f}", help="Estimated cost for the entire session." )
+        st.metric(label=":blue[Session Cost]", value=f"${st.session_state.usd:.4f}", help="Estimated cost for the entire session calculated using %.4f per 1K input tokens and %.4f per 1K output tokens" % (COST_PER_1K_INPUT, COST_PER_1K_OUTPUT))
 
     st.caption(f"Token Usage: :blue[{st.session_state.total_tokens}] total tokens used.", help="Total number of tokens consumed in the entire session.")
     
-    with st.expander(":blue[Breakdown Token Usage:]"):        
-        st.markdown(f"##### :blue[Last Interaction Token:] {st.session_state.total_tokens_last}")
+    with st.expander(":blue[Token Usage Breakdown:]"):        
+        st.markdown(f"##### :blue[Last Interaction Tokens:] {st.session_state.total_tokens_last}")
         col1, col2 = st.columns(2)
         col1.metric("Input Tokens", f"{st.session_state.input_tokens_last}")
         col2.metric("Output Tokens", f"{st.session_state.output_tokens_last}")
         st.metric("Last Est. Cost (USD)", f"${st.session_state.usd_last:.4f}", help="Estimated cost for the last interaction.")
 
-        st.markdown(f"##### :blue[Session Total Token:] {st.session_state.total_tokens}")
+        st.markdown(f"##### :blue[Session Total Tokens:] {st.session_state.total_tokens}")
         col3, col4 = st.columns(2)
         col3.metric("Total Input", f"{st.session_state.total_input_tokens}")
         col4.metric("Total Output", f"{st.session_state.total_output_tokens}")
