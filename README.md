@@ -7,23 +7,27 @@
 ![License](https://img.shields.io/badge/License-MIT-grey)
 
 An advanced **Agentic AI Client** that performs autonomous web research using the **Model Context Protocol (MCP)**.
-This project demonstrates a decoupled architecture where the reasoning engine (Client) communicates with tools (Server) via standardized protocols, featuring robust observability and asynchronous state management.
+This project demonstrates a decoupled microservices architecture where the reasoning engine (Client) communicates with tools (Server) via standardized protocols, featuring robust observability and asynchronous state management.
+
+🔗 **Live Demo:** [Insert Render App URL Here]
 
 ---
 
 ## 🚀 Architecture Overview
 
-The system is split into two decoupled microservices:
+The system is split into two decoupled microservices communicating over HTTP/SSE:
 
-1.  **The Client (Brain):** A Streamlit application hosting a **LangGraph ReAct Agent**. It manages conversation history, reasoning loops, and connects to tools via MCP over SSE (Server-Sent Events).
+1.  **The Client (Brain):** A Streamlit application hosting a **LangGraph ReAct Agent**. It manages conversation history, reasoning loops, and connects to the remote tool server via MCP.
 2.  **The Server (Tools):** A **FastAPI + FastMCP** server hosted on Render. It exposes the Tavily Search API as a standardized MCP Tool.
 
-### Key Features
-*   **Decoupled Tooling:** The LLM (Client) and the Tool Execution (Server) are completely separate, communicating only via the MCP standard.
-*   **Safe Grounding (Provenance):** The agent uses a hybrid approach, consuming both a search summary and raw source data (JSON) to verify facts and cite URLs, minimizing hallucinations.
-*   **Asynchronous Core:** Implements a custom background `asyncio` loop to handle non-blocking MCP streams within the synchronous Streamlit environment.
-*   **Full Observability:** Logs are dispatched to multiple sinks: Local JSONL, **Redis** (for live monitoring), and **BetterStack** (cloud logging).
-*   **Persistence:** Conversation state is preserved using an Async SQLite Checkpointer.
+### Key Engineering Features
+*   **Decoupled Security:** The Client (LLM) holds NO API keys for the search engine. It communicates purely via the MCP contract, simulating secure enterprise tool usage.
+*   **Hybrid Grounding Strategy:** The agent uses a dual-layer approach: it consumes a high-level summary from the search engine for context, but strictly verifies facts against **raw JSON sources** to ensure accurate provenance and minimize hallucinations.
+*   **Transparent Reasoning (XAI):** The UI exposes the Agent's "Chain of Thought" in real-time, allowing users to audit the decision-making process (e.g., why a specific tool was called) and verify intermediate steps.
+*   **Live FinOps Monitoring:** Includes a real-time dashboard for token usage (Input/Output) and estimated cost calculation, essential for managing LLM operational expenses in production.
+*   **Concurrency Management:** Implements a custom background `asyncio` event loop to handle non-blocking MCP streams within Streamlit's synchronous runtime.
+*   **Full Observability:** Logs are dispatched to multiple sinks: Local JSONL, **Redis** (as a high-throughput buffer), and **BetterStack** (for cloud monitoring).
+*   **State Persistence:** Conversation state is preserved across turns using an Async SQLite Checkpointer.
 
 ---
 
@@ -61,7 +65,7 @@ GENAI_MODEL=your_model
 # MCP Server Configuration
 # If running the server locally: http://localhost:8080/tav/sse
 # If using the live demo server:
-MCP_TAVILY_URL=https://tavily-mcp-server-wqe5.onrender.com/tav/mcp
+MCP_TAVILY_URL=https://tavily-mcp-server-wqe5.onrender.com/tav/mcp/
 MCP_SERVER_NAME=tavily
 
 # Logging (Optional)
@@ -77,14 +81,11 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 ---
-
 ## 🧩 How It Works (The ReAct Loop)
-*   **User Query:** The user asks a question (e.g., "Latest news on AI?").
-*   **Reasoning:** The LangGraph agent analyzes the query. It decides it needs external info.
-*   **Tool Call (MCP):** The agent constructs a tool call (web_search). This is sent via SSE to the MCP Server.
-*   **Execution:** The Server executes the Tavily API call and formats the result as a structured JSON object containing both a summary and raw sources.
-*   **Observation:** The JSON result is sent back to the Client.
-*   **Response Generation:** The agent reads the observation, verifies the facts against the sources, and generates the final answer with citations.
+*   **Reasoning:** The LangGraph agent analyzes the user query.
+*   **Protocol Handshake:** The client establishes a connection to the MCP Server.
+*   **Tool Execution:** The server executes the Tavily API call and returns a structured JSON object containing both a synthesis and raw content excerpts.
+*   **Verification:** The agent reads the JSON, verifies the summary against the raw excerpts, and generates a citation-backed response.
 
 ---
 
