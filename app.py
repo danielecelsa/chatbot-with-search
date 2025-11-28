@@ -61,7 +61,7 @@ COST_PER_1K_INPUT = float(os.getenv("COST_PER_1K_TOKENS_USD_INPUT", "0.002"))
 COST_PER_1K_OUTPUT = float(os.getenv("COST_PER_1K_TOKENS_USD_OUTPUT", "0.002"))
 
 MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", "tavily")
-MCP_URL = os.getenv("MCP_TAVILY_URL", "https://tavily-mcp-server-wqe5.onrender.com/tav/mcp/")
+MCP_URL = os.getenv("MCP_TAVILY_URL", "https://tavily-mcp-server-wqe5.onrender.com/tav/mcp")
 
 MCP_CONFIG = {
     MCP_SERVER_NAME: {
