@@ -123,8 +123,8 @@ def get_llm():
         model=MODEL,
         google_api_key=GOOGLE_API_KEY,
         temperature=0.2,
-        #convert_system_message_to_human=True,
         safety_settings=None,
+        transport="rest"  # if not working, just use python 3.11 (not 3.13)
         )
     except Exception as e:
         logger_all.exception("Could not initialize LLM: %s", e)
