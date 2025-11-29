@@ -197,8 +197,8 @@ st.title("🔌 Decoupled Research Agent (MCP)")
 body = """
 **Autonomous Web Researcher - powered by MCP**
 
-This application demonstrates a **decoupled Agentic Architecture** using the **Model Context Protocol (MCP)**.
-Instead of embedding tools directly into the application code, the ReAct Agent (Client) connects to a remote **MCP Server** via SSE (Server-Sent Events) to access *search capabilities*.
+Implements the **Model Context Protocol (MCP)**, the new open standard for connecting AI models to data. 
+This architecture decouples the *Brain* (Streamlit Client) from the *Tools* (FastAPI Server with search capabilities), simulating a scalable microservices environment.
 
 **Key Features:**
 *   **🔌 Microservices Architecture:** The LLM logic (Client) is completely decoupled from the Tool execution (MCP Server). This creates a standardized interface for connecting AI models to external data.
@@ -347,16 +347,17 @@ with st.sidebar:
         st.markdown("> *What happened in the summer?*")
 
         with st.expander("👀 **What to watch:**"):
-            st.markdown("**1. The MCP Protocol Trace**:")
+            st.markdown("**1. The ReAct Loop (Reason + Act)**:")
             st.caption("👇 *Check the **🧠 Agent's Reasoning Steps** section below*")
             st.markdown("""
-                        This is not just a chat log. It is a trace of the **Remote Procedure Call**. You will see the JSON payload sent to the MCP Server and the structured JSON received back.
+                        Observe the **Iterative Thought Process**. Unlike a simple linear search, the agent autonomously executes a **multi-step workflow** if needed (as per the *'Solar Eclipse'* example above).
                         """)
 
-            st.markdown("**2. Source Provenance (Anti-Hallucination)**:")
+            st.markdown("**2. Source Provenance & Grounding**:")
             st.caption("👇 *Check the **🗂️ Sources' Provenance** section below*")
             st.markdown("""
-                        Unlike standard chatbots, this system separates the **AI Summary** from the **Raw Evidence**. Click the expandable lists to verify the actual URLs used to ground the answer.
+                        This system implements **Hybrid Grounding** to reduce *Hallucinations*. It separates the AI's generated summary from the raw search evidence.
+                        Click the expandable lists to verify the actual URLs used to ground the answer.
                         """)
             
             st.markdown("**3. Cost Attribution & FinOps**:")
