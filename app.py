@@ -18,6 +18,7 @@ import time
 from time import perf_counter
 
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 # LangGraph / LangChain Core
@@ -111,6 +112,9 @@ if "usd" not in st.session_state:
     st.session_state.usd = 0.0
 if "usd_last" not in st.session_state:
     st.session_state.usd_last = 0.0
+
+if 'tour_completed' not in st.session_state:
+    st.session_state['tour_completed'] = False
 
 # ------------------------------
 # LLM
@@ -471,3 +475,246 @@ for msg in st.session_state.chat_history:
         content = getattr(msg, "content", None) or str(msg)
         with st.chat_message("assistant"):
             st.write(content)
+
+# ------------------------------
+# INTERACTIVE TUTORIAL (Driver.js)
+# ------------------------------
+
+def get_tour_script(run_id):
+    return f"""
+    <!-- Run ID: {run_id} -->
+    <script>
+        function injectAndRunTour() {{
+            const parentDoc = window.parent.document;
+            const parentWin = window.parent;
+
+            // --- 1. CSS Injection ---
+            if (!parentDoc.getElementById('driver-js-css')) {{
+                const link = parentDoc.createElement('link');
+                link.id = 'driver-js-css';
+                link.rel = 'stylesheet';
+                link.href = 'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.css';
+                parentDoc.head.appendChild(link);
+            }}
+
+            // --- CUSTOM STYLING (Dark Mode Theme FIXED) ---
+            const customStyle = `
+                /* Main Popover Box */
+                .driver-popover {{
+                    background-color: #1e1e1e !important;
+                    color: #ffffff !important;
+                    border-radius: 12px;
+                    /* Rimuoviamo il bordo solido per evitare conflitti grafici con la freccia */
+                    border: none; 
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+                    font-family: sans-serif;
+                }}
+                
+                /* Title */
+                .driver-popover-title {{
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #61dafb; /* React Blue */
+                    margin-bottom: 8px;
+                }}
+                
+                /* Description */
+                .driver-popover-description {{
+                    font-size: 14px;
+                    line-height: 1.6;
+                    color: #e0e0e0;
+                }}
+                
+                /* Buttons */
+                .driver-popover-footer button {{
+                    background-color: #333;
+                    color: white;
+                    border: 1px solid #555;
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                    text-shadow: none;
+                    transition: background 0.2s;
+                }}
+                .driver-popover-footer button:hover {{
+                    background-color: #555;
+                }}
+                
+                /* Skip Button Custom Style */
+                .driver-popover-footer .driver-skip-btn {{
+                    background-color: transparent;
+                    color: #ff6b6b; /* Soft Red */
+                    border: none;
+                    margin-right: auto; 
+                    font-weight: bold;
+                    cursor: pointer;
+                    padding-left: 0;
+                }}
+                .driver-popover-footer .driver-skip-btn:hover {{
+                    text-decoration: underline;
+                    background-color: transparent;
+                }}
+
+                /* --- ARROW FIX --- */
+                /* La freccia è generata dai bordi. Dobbiamo colorare il lato CHE TOCCA il box */
+                
+                /* Se la freccia è a SINISTRA del box (il box è a destra dell'elemento) */
+                .driver-popover-arrow-side-left {{
+                    border-right-color: #1e1e1e !important; 
+                }}
+                
+                /* Se la freccia è a DESTRA del box */
+                .driver-popover-arrow-side-right {{
+                    border-left-color: #1e1e1e !important; 
+                }}
+                
+                /* Se la freccia è SOPRA il box */
+                .driver-popover-arrow-side-top {{
+                    border-bottom-color: #1e1e1e !important; 
+                }}
+                
+                /* Se la freccia è SOTTO il box */
+                .driver-popover-arrow-side-bottom {{
+                    border-top-color: #1e1e1e !important; 
+                }}
+            `;
+
+            if (!parentDoc.getElementById('driver-custom-style')) {{
+                const style = parentDoc.createElement('style');
+                style.id = 'driver-custom-style';
+                style.innerHTML = customStyle;
+                parentDoc.head.appendChild(style);
+            }}
+
+            // --- 2. JS Injection ---
+            if (!parentDoc.getElementById('driver-js-script')) {{
+                const script = parentDoc.createElement('script');
+                script.id = 'driver-js-script';
+                script.src = 'https://cdn.jsdelivr.net/npm/driver.js@1.0.1/dist/driver.js.iife.js';
+                script.onload = () => runTour(parentWin, parentDoc);
+                parentDoc.head.appendChild(script);
+            }} else {{
+                setTimeout(() => runTour(parentWin, parentDoc), 500);
+            }}
+        }}
+
+        function runTour(parentWin, parentDoc) {{
+            const driver = parentWin.driver.js.driver;
+            
+            // Helper to find elements by text content
+            function findEl(tag, text, context = parentDoc) {{
+                const elements = context.querySelectorAll(tag);
+                for (const el of elements) {{
+                    if (el.textContent.includes(text)) return el;
+                }}
+                return null;
+            }}
+
+            const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+
+            const driverObj = driver({{
+                showProgress: true,
+                animate: true,
+                allowClose: true,
+                nextBtnText: 'Next →',
+                prevBtnText: '← Back',
+                doneBtnText: 'Finish',
+                // Inject SKIP button
+                onPopoverRendered: (popover) => {{
+                    const footer = popover.wrapper.querySelector('.driver-popover-footer');
+                    if (footer && !footer.querySelector('.driver-skip-btn')) {{
+                        const skipBtn = document.createElement('button');
+                        skipBtn.className = 'driver-skip-btn';
+                        skipBtn.innerText = 'Skip Tutorial';
+                        skipBtn.onclick = () => {{
+                            driverObj.destroy();
+                        }};
+                        footer.insertBefore(skipBtn, footer.firstChild);
+                    }}
+                }},
+                steps: [
+                    {{ 
+                        popover: {{ 
+                            title: '👋 Welcome to Decoupled Research Agent', 
+                            description: 'A quick tour to demonstrate the Microservices (MCP) architecture.', 
+                        }} 
+                    }},
+                    {{ 
+                        element: parentDoc.querySelector('[data-testid="stChatInput"]'), 
+                        popover: {{ 
+                            title: '💬 Chat Console', 
+                            description: 'Type here. You can ask for complex searches (e.g., "Historical events of 2024").', 
+                            side: "top", align: 'start' 
+                        }} 
+                    }},
+                    {{ 
+                        element: findEl('summary', 'Architecture', sidebar), 
+                        popover: {{ 
+                            title: '🛠️ Tech Architecture', 
+                            description: 'Open to see details about LangGraph, MCP, and FastAPI.', 
+                            side: "right", align: 'start' 
+                        }} 
+                    }},
+                    {{ 
+                        element: findEl('summary', 'How to Test', sidebar), 
+                        popover: {{ 
+                            title: '🧪 Test Scenarios', 
+                            description: 'Suggested prompts to test the agent capabilities.', 
+                            side: "right", align: 'start' 
+                        }} 
+                    }},
+                    {{ 
+                        element: findEl('h3', 'Live Metrics', sidebar), 
+                        popover: {{ 
+                            title: '📊 Live Metrics', 
+                            description: 'Real-time monitoring of latency, tokens, and USD costs.', 
+                            side: "right", align: 'start' 
+                        }} 
+                    }},
+                    {{ 
+                        element: findEl('h3', 'Reasoning Steps', sidebar), 
+                        popover: {{ 
+                            title: '🧠 Agent Reasoning', 
+                            description: 'Watch the agent "think": see tool calls and observations.', 
+                            side: "right", align: 'start' 
+                        }} 
+                    }},
+                    {{ 
+                        element: findEl('h3', 'Provenance', sidebar), 
+                        popover: {{ 
+                            title: '🗂️ Sources & Truth', 
+                            description: 'Click to verify the original URLs used to ground the answer.', 
+                            side: "right", align: 'start' 
+                        }} 
+                    }},
+                    {{ 
+                        element: findEl('button', 'Restart Tutorial', sidebar), 
+                        popover: {{ 
+                            title: '🔄 Replay', 
+                            description: 'Click here anytime to watch this tutorial again.', 
+                            side: "top", align: 'center' 
+                        }} 
+                    }}
+                ]
+            }});
+
+            driverObj.drive();
+        }}
+
+        injectAndRunTour();
+    </script>
+    """
+
+# --- LOGICA PYTHON ---
+
+if not st.session_state['tour_completed']:
+    unique_run_id = str(time.time())
+    components.html(get_tour_script(unique_run_id), height=0)
+    st.session_state['tour_completed'] = True
+
+# --- SIDEBAR BUTTON ---
+with st.sidebar:
+    st.markdown("---")
+    def reset_tour():
+        st.session_state['tour_completed'] = False
+    
+    st.button("🔄 Restart Tutorial", on_click=reset_tour)
